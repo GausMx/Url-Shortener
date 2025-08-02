@@ -1,9 +1,11 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGO_URI);
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const dns = require('dns');
+const url = require('url');
 const app = express();
 
 // Basic Configuration
@@ -28,20 +30,25 @@ const urlSchema = new mongoose.Schema({
 });
 const Url = mongoose.model('Url', urlSchema);
 app.post('/api/shorturl', async(req, res) => {
-  const url = req.body.url;
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required'});
+  const originalUrl = req.body.url;
+  const parsedUrl = url.parse(originalUrl);
+  const hostname = parsedUrl.hostname;
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:'){
+    return res.json({ error: 'invalid url'})
   }
-  if (!url.startsWith('http://') && !url.startsWith('https://')){
-    return res.status(400).json({ error: 'Invalid URL format'});
-  }
-  const shortUrl = Math.floor(Math.random() * 1000000);
-  const newUrl = new Url({
-    original_url: url,
-    short_url: shortUrl
+  dns.lookup(hostname, async (err) => {
+    if (err) {
+      return res.json({erro: 'invalid url'});
+    } else {
+        const shortUrl = Math.floor(Math.random() * 1000000);
+        const newUrl = new Url({
+        original_url: originalUrl,
+        short_url: shortUrl
   });
-  await newUrl.save();
-  res.json({ originalUrl: url, shortUrl: shortUrl});
+     await newUrl.save();
+  res.json({ original_url: originalUrl, short_url: shortUrl});
+}
+  });
 });
 app.get('/api/shorturl/:short_url', async (req, res) => {
   const shortUrl = req.params.short_url;
@@ -56,3 +63,9 @@ app.get('/api/shorturl/:short_url', async (req, res) => {
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
 });
+
+});
+app.listen(port, function() {
+  console.log(`Listening on port ${port}`);
+});
+
